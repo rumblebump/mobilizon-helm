@@ -18,6 +18,9 @@ spec:
   hostnames:
     - {{ .Values.mobilizon.host | quote }}
   rules:
+    {{- with .Values.httpRoute.rules }}
+    {{- tpl (toYaml .) $ | nindent 4 }}
+    {{- else }}
     - matches:
         - path:
             type: PathPrefix
@@ -25,8 +28,5 @@ spec:
       backendRefs:
         - name: {{ include "mobilizon.fullname" . }}
           port: {{ .Values.service.port }}
-      {{- with .Values.httpRoute.timeouts }}
-      timeouts:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
 {{- end }}

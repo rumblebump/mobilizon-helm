@@ -60,15 +60,29 @@ tests:
       - notExists:
           path: spec.rules[0].timeouts
 
-  - it: sets HTTPRoute rule timeouts
+  - it: replaces the HTTPRoute rules when given
     template: httproute.yaml
     set:
       httpRoute.enabled: true
       httpRoute.parentRefs:
         - name: gateway
-      httpRoute.timeouts:
-        request: 0s
+      httpRoute.rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+          backendRefs:
+            - name: '{{ include "mobilizon.fullname" . }}'
+              port: 80
+          timeouts:
+            request: 0s
     asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 1
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: test-mobilizon
       - equal:
           path: spec.rules[0].timeouts
           value:

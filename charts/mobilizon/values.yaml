@@ -104,8 +104,16 @@ httpRoute:
   #  - name: my-gateway
   #    namespace: gateway-system
   #    sectionName: https
-  # Rule timeouts, for example {request: 0s} to disable the gateway's request timeout.
-  timeouts: {}
+  # Replaces the default rule (all paths to the Mobilizon service) when set. Values are run
+  # through tpl, so the service name can be written as {{ include "mobilizon.fullname" . }}.
+  rules: []
+  #  - matches:
+  #      - path: {type: PathPrefix, value: /}
+  #    backendRefs:
+  #      - name: '{{ include "mobilizon.fullname" . }}'
+  #        port: 80
+  #    timeouts:
+  #      request: 0s
 
 extraEnv: []
 extraEnvFrom: []
