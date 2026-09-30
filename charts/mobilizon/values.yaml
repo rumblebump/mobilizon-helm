@@ -159,6 +159,54 @@ caddy:
   tolerations: []
   affinity: {}
 
+# Login through an OpenID Connect provider: adds a button to the login page. Mobilizon matches
+# accounts by email only, and an OIDC login creates the account even when registrations are
+# closed, so only connect a provider whose users should all get in. Turned on by dex.enabled,
+# which also fills in issuer, clientId and label.
+oidc:
+  enabled: false
+  # Button text on the login page. Defaults to "Dex" with the bundled Dex.
+  label: ""
+  issuer: ""
+  clientId: ""
+  # Required unless existingSecret is set. The bundled Dex reads the same secret.
+  clientSecret: ""
+  existingSecret: ""
+  secretKeys:
+    clientSecret: oidc-client-secret
+  scopes: [openid, profile, email]
+
+# Optional Dex (https://dexidp.io) as a small OIDC provider with local users, wired to the
+# Mobilizon login. Served on the same host under /dex: the chart routes that path to Dex in the
+# default HTTPRoute, Ingress and Caddy config. Sessions live in memory, so a restart logs users
+# out of Dex (not of Mobilizon).
+dex:
+  enabled: false
+  image:
+    repository: ghcr.io/dexidp/dex
+    tag: v2.45.1
+    pullPolicy: IfNotPresent
+  # Defaults to https://<mobilizon.host>/dex. On another host, route it to the Dex Service yourself.
+  issuer: ""
+  # Local users. Hash passwords with bcrypt, for example:
+  #   htpasswd -nbBC 10 "" 'the-password' | cut -d: -f2
+  # The generated config (hashes included) is stored in a Secret.
+  staticPasswords: []
+  #  - email: admin@example.org
+  #    hash: "$2y$10$..."
+  #    username: admin
+  #    userID: 08a8684b-db88-4b73-90a9-3cd1661f5466
+  # Merged over the generated config, for example {expiry: {idTokens: 1h}} or connectors.
+  config: {}
+  # Secret with a complete `config.yaml` key that replaces the generated one (keeps password
+  # hashes out of values). It must contain a static client with id oidc.clientId, secretEnv
+  # DEX_CLIENT_SECRET and redirect URI https://<mobilizon.host>/auth/oidc/callback.
+  existingSecret: ""
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 extraEnv: []
 extraEnvFrom: []
 

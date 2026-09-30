@@ -23,6 +23,8 @@ annotations:
       image: postgis/postgis:17-3.6-alpine
     - name: caddy
       image: caddy:2.11.4-alpine
+    - name: dex
+      image: ghcr.io/dexidp/dex:v2.45.1
   artifacthub.io/links: |
     - name: Chart source
       url: https://github.com/rumblebump/mobilizon-helm

@@ -1,0 +1,11 @@
+{{- if include "mobilizon.oidc.enabled" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mobilizon.fullname" . }}-config
+  labels:
+    {{- include "mobilizon.labels" . | nindent 4 }}
+data:
+  config.exs: |
+    {{- include "mobilizon.configExs" . | nindent 4 }}
+{{- end }}

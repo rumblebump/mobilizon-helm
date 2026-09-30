@@ -21,6 +21,15 @@ spec:
     {{- with .Values.httpRoute.rules }}
     {{- tpl (toYaml .) $ | nindent 4 }}
     {{- else }}
+    {{- with include "mobilizon.dex.path" . }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ . }}
+      backendRefs:
+        - name: {{ include "mobilizon.dex.fullname" $ }}
+          port: 5556
+    {{- end }}
     - matches:
         - path:
             type: PathPrefix
