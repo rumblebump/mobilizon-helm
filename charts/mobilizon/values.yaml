@@ -117,6 +117,48 @@ httpRoute:
   #    timeouts:
   #      request: 0s
 
+# Optional Caddy in front of Mobilizon that terminates TLS with automatic Let's Encrypt
+# certificates for mobilizon.host. Leave it off when an Ingress controller or Gateway already
+# handles TLS. Caddy listens on 8080/8443 as a non-root user; its Service exposes 80/443.
+caddy:
+  enabled: false
+  image:
+    # Use a custom build (xcaddy) for plugins such as geoblocking or DNS providers.
+    repository: caddy
+    tag: 2.11.4-alpine
+    pullPolicy: IfNotPresent
+  # ACME account email (recommended).
+  email: ""
+  # Extra global options, for example `acme_ca https://acme-staging-v02.api.letsencrypt.org/directory`.
+  globalOptions: ""
+  # Extra directives inside the mobilizon.host site block, before reverse_proxy (run through tpl).
+  siteConfig: ""
+  # Additional site blocks appended to the Caddyfile (run through tpl).
+  extraSites: ""
+  # Replaces the whole generated Caddyfile (run through tpl). Keep http_port 8080 / https_port 8443.
+  caddyfile: ""
+  # ConfigMap with a `Caddyfile` key to use instead of the chart's.
+  existingConfigMap: ""
+  # For example DNS-provider API tokens from a Secret.
+  extraEnv: []
+  extraEnvFrom: []
+  service:
+    type: LoadBalancer
+    annotations: {}
+    loadBalancerIP: ""
+    # Local keeps the client IP (useful for geoblocking).
+    externalTrafficPolicy: Local
+  # ACME account and certificates.
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+    existingClaim: ""
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 extraEnv: []
 extraEnvFrom: []
 

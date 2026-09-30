@@ -1,0 +1,137 @@
+suite: caddy
+templates:
+  - caddy.yaml
+release:
+  name: test
+set:
+  mobilizon.host: events.example.org
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders ConfigMap, PVC, Service and Deployment when enabled
+    set:
+      caddy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 4
+
+  - it: terminates TLS for the host and proxies to Mobilizon
+    set:
+      caddy.enabled: true
+      caddy.email: admin@example.org
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "email admin@example.org"
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "http_port 8080"
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "(?m)^events\\.example\\.org \\{\\n\\treverse_proxy test-mobilizon:80\\n\\}"
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "http://events.example.org \\{\\n\\tredir https://\\{host\\}\\{uri\\} permanent"
+
+  - it: adds site directives, global options and extra sites
+    set:
+      caddy.enabled: true
+      caddy.globalOptions: "order geoip first"
+      caddy.siteConfig: "encode gzip"
+      caddy.extraSites: "auth.example.org {\n\treverse_proxy {{ include \"mobilizon.fullname\" . }}-dex:5556\n}"
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "\\torder geoip first\\n\\}"
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "events.example.org \\{\\n\\tencode gzip\\n\\treverse_proxy"
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "auth.example.org \\{\\n\\treverse_proxy test-mobilizon-dex:5556"
+
+  - it: uses a full Caddyfile override
+    set:
+      caddy.enabled: true
+      caddy.caddyfile: ":8080 {\n\trespond ok\n}"
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: data.Caddyfile
+          value: ":8080 {\n\trespond ok\n}\n"
+
+  - it: mounts an existing ConfigMap and skips its own
+    set:
+      caddy.enabled: true
+      caddy.existingConfigMap: my-caddyfile
+    asserts:
+      - hasDocuments:
+          count: 3
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: caddyfile
+            configMap:
+              name: my-caddyfile
+        documentIndex: 2
+
+  - it: exposes 80 and 443 through a LoadBalancer
+    set:
+      caddy.enabled: true
+    documentIndex: 2
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
+      - equal:
+          path: spec.ports
+          value:
+            - name: http
+              port: 80
+              targetPort: http
+            - name: https
+              port: 443
+              targetPort: https
+
+  - it: keeps certificates on a PVC and runs unprivileged
+    set:
+      caddy.enabled: true
+    documentIndex: 3
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
+          value: test-mobilizon-caddy
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: ["ALL"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/caddyfile"]
+
+  - it: uses emptyDir without persistence
+    set:
+      caddy.enabled: true
+      caddy.persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: spec.template.spec.volumes[1].emptyDir
+          value: {}
+        documentIndex: 2
