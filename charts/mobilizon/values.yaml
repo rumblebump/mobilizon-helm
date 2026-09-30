@@ -9,8 +9,10 @@ nameOverride: ""
 fullnameOverride: ""
 
 mobilizon:
-  # Public hostname. Mobilizon always builds https://<host> URLs, so terminate TLS in front of it.
-  host: mobilizon.example.com
+  # Public hostname (required). Mobilizon always builds https://<host> URLs, so terminate TLS in
+  # front of it. It is stored in the database on first start (actor URLs), so set it before the
+  # first install; changing it later breaks federation and the internal relay actor.
+  host: ""
   name: Mobilizon
   description: Change this to a proper description of your instance
   email: noreply@mobilizon.example.com
