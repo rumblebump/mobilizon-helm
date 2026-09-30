@@ -149,6 +149,38 @@ tests:
           path: spec.template.spec.initContainers[0].name
           value: init-uploads
 
+  - it: gives the init container the main resources by default
+    set:
+      resources:
+        requests: {cpu: 100m, memory: 512Mi}
+        limits: {memory: 1Gi}
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].resources
+          value:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {memory: 1Gi}
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.allowPrivilegeEscalation
+          value: false
+
+  - it: lets initUploads.resources override the init container resources
+    set:
+      resources:
+        requests: {cpu: 100m, memory: 512Mi}
+      initUploads.resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 50m, memory: 32Mi}
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].resources
+          value:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+
   - it: mounts an existing claim
     set:
       persistence.existingClaim: my-uploads

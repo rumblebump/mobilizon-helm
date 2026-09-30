@@ -47,6 +47,10 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
+          {{- with .Values.initUploads.resources | default .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: uploads
               mountPath: /var/lib/mobilizon/uploads
