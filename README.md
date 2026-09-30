@@ -83,8 +83,6 @@ See [`values.yaml`](charts/mobilizon/values.yaml) for all options.
 
 Every push to `main` publishes the chart, once lint and the [helm-unittest](https://github.com/helm-unittest/helm-unittest) suite in `charts/mobilizon/tests` pass. It goes to `oci://ghcr.io/rumblebump/charts/mobilizon`. It is not versioned yet: Helm needs a SemVer tag, so the chart is always pushed as `0.0.0-dev` and each release overwrites the previous one.
 
-Run the unit tests locally with `helm plugin install https://github.com/helm-unittest/helm-unittest` and `helm unittest charts/mobilizon`.
-
 ```sh
 helm pull oci://ghcr.io/rumblebump/charts/mobilizon --version 0.0.0-dev
 helm install mobilizon oci://ghcr.io/rumblebump/charts/mobilizon --version 0.0.0-dev -f my-values.yaml
@@ -100,3 +98,5 @@ source:
 ```
 
 Because the tag never changes, Argo CD keeps serving its cached render after a new push. Hard refresh the application to pick up the latest chart.
+
+Run the unit tests locally with `helm plugin install https://github.com/helm-unittest/helm-unittest` and `helm unittest charts/mobilizon`.
