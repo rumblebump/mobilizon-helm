@@ -1,0 +1,10 @@
+Mobilizon will be served at https://{{ .Values.mobilizon.host }} once the first start has run the migrations.
+{{- if not (or .Values.ingress.enabled .Values.httpRoute.enabled) }}
+
+No ingress or HTTPRoute is enabled. To try it locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "mobilizon.fullname" . }} 4000:{{ .Values.service.port }}
+{{- end }}
+
+Create the first administrator:
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "mobilizon.fullname" . }} -- \
+    /bin/mobilizon_ctl users.new admin@example.com --admin --password 'change-me'

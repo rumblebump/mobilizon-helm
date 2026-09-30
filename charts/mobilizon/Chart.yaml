@@ -1,0 +1,15 @@
+apiVersion: v2
+name: mobilizon
+description: Minimal Helm chart for Mobilizon, the federated event and group platform
+type: application
+version: 0.1.0
+appVersion: "5.2.4"
+home: https://mobilizon.org
+sources:
+  - https://framagit.org/kaihuri/mobilizon
+  - https://github.com/rumblebump/mobilizon-helm
+keywords:
+  - mobilizon
+  - fediverse
+  - activitypub
+  - events

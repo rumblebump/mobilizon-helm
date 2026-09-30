@@ -1,0 +1,16 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint --strict charts/mobilizon
+      - run: helm template test charts/mobilizon > /dev/null
+      - run: helm template test charts/mobilizon --set postgresql.enabled=false,database.host=db,database.existingSecret=db,mobilizon.existingSecret=keys,smtp.enabled=true,smtp.host=smtp,smtp.existingSecret=smtp > /dev/null
