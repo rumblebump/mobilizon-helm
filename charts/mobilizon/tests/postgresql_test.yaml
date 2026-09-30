@@ -1,0 +1,41 @@
+suite: postgresql
+templates:
+  - postgresql.yaml
+release:
+  name: test
+set:
+  database.existingSecret: mobilizon-db
+tests:
+  - it: renders a Service and a PostGIS StatefulSet
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: Service
+        documentIndex: 0
+      - isKind:
+          of: StatefulSet
+        documentIndex: 1
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^postgis/postgis:"
+        documentIndex: 1
+
+  - it: shares the database password with Mobilizon
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mobilizon-db
+                key: password
+
+  - it: is not rendered when disabled
+    set:
+      postgresql.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

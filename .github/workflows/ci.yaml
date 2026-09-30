@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Not versioned yet: every push to main overwrites this tag.
+  CHART_VERSION: 0.0.0-dev
+  HELM_UNITTEST_VERSION: v1.1.2
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: |
+          for f in charts/mobilizon/ci/*-values.yaml; do
+            helm lint --strict charts/mobilizon -f "$f"
+            helm template test charts/mobilizon -f "$f" > /dev/null
+          done
+
+  unittest:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: |
+          # Helm 4 wants --verify=false for unsigned plugins; Helm 3 has no such flag.
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version "$HELM_UNITTEST_VERSION" --verify=false \
+            || helm plugin install https://github.com/helm-unittest/helm-unittest --version "$HELM_UNITTEST_VERSION"
+          helm unittest charts/mobilizon
+
+  release:
+    needs: unittest
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: release
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: |
+          registry="oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm package charts/mobilizon --version "$CHART_VERSION" -d dist
+          helm push "dist/mobilizon-$CHART_VERSION.tgz" "$registry"

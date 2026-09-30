@@ -1,0 +1,40 @@
+suite: pvc
+templates:
+  - pvc.yaml
+release:
+  name: test
+tests:
+  - it: is kept on uninstall
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+      - equal:
+          path: spec.resources.requests.storage
+          value: 5Gi
+      - notExists:
+          path: spec.storageClassName
+
+  - it: sets the storage class
+    set:
+      persistence.storageClass: fast
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: fast
+
+  - it: is not rendered with an existing claim
+    set:
+      persistence.existingClaim: my-uploads
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: is not rendered without persistence
+    set:
+      persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
