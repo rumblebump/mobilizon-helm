@@ -78,3 +78,23 @@ Any other variable the image reads (see `config.exs` in the image, for example `
 The bundled `postgis/postgis` image is published for amd64 only. On arm64, point `postgresql.image` at an arm64 PostGIS build or use an external database.
 
 See [`values.yaml`](charts/mobilizon/values.yaml) for all options.
+
+## Installing from GHCR
+
+Every push to `main` that touches the chart publishes it to `oci://ghcr.io/rumblebump/charts/mobilizon`. It is not versioned yet: Helm needs a SemVer tag, so the chart is always pushed as `0.0.0-dev` and each release overwrites the previous one.
+
+```sh
+helm pull oci://ghcr.io/rumblebump/charts/mobilizon --version 0.0.0-dev
+helm install mobilizon oci://ghcr.io/rumblebump/charts/mobilizon --version 0.0.0-dev -f my-values.yaml
+```
+
+With Argo CD, register `ghcr.io/rumblebump/charts` as a Helm repository with `enableOCI: "true"` (no credentials needed while the package is public), then point the application at it. The `repoURL` has no `oci://` prefix:
+
+```yaml
+source:
+  repoURL: ghcr.io/rumblebump/charts
+  chart: mobilizon
+  targetRevision: 0.0.0-dev
+```
+
+Because the tag never changes, Argo CD keeps serving its cached render after a new push. Hard refresh the application to pick up the latest chart.
