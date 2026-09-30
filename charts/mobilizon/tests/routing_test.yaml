@@ -57,7 +57,22 @@ tests:
           value:
             name: test-mobilizon
             port: 80
+      - notExists:
+          path: spec.rules[0].timeouts
 
+  - it: sets HTTPRoute rule timeouts
+    template: httproute.yaml
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: gateway
+      httpRoute.timeouts:
+        request: 0s
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts
+          value:
+            request: 0s
 
   - it: requires parentRefs for the HTTPRoute
     template: httproute.yaml

@@ -104,6 +104,8 @@ httpRoute:
   #  - name: my-gateway
   #    namespace: gateway-system
   #    sectionName: https
+  # Rule timeouts, for example {request: 0s} to disable the gateway's request timeout.
+  timeouts: {}
 
 extraEnv: []
 extraEnvFrom: []
