@@ -31,7 +31,7 @@ kubectl exec deploy/mobilizon -- /bin/mobilizon_ctl users.new admin@example.org 
 | Secret | Only for credentials given inline in values instead of an existing Secret. |
 | Ingress / HTTPRoute | Off by default. |
 
-Mobilizon always generates `https://<mobilizon.host>` URLs, so put TLS in front of it (Ingress, Gateway or another proxy).
+Mobilizon always generates `https://<mobilizon.host>` URLs, so put TLS in front of it (Ingress, Gateway or another proxy). `mobilizon.host` is required and is written into the database on first start (local actor URLs, including the internal relay actor), so set it before the first install. Changing it afterwards leads to errors such as `Relay actor not found`.
 
 ## Using existing Secrets
 

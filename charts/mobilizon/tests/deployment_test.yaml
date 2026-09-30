@@ -4,6 +4,7 @@ templates:
 release:
   name: test
 set:
+  mobilizon.host: events.example.org
   mobilizon.existingSecret: mobilizon-keys
   database.existingSecret: mobilizon-db
 tests:
@@ -197,3 +198,10 @@ tests:
           path: spec.template.spec.volumes
       - notExists:
           path: spec.template.spec.initContainers
+
+  - it: requires mobilizon.host
+    set:
+      mobilizon.host: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: mobilizon.host is required (the public hostname, fixed after the first start)

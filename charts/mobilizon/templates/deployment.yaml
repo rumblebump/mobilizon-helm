@@ -65,7 +65,7 @@ spec:
               drop: ["ALL"]
           env:
             - name: MOBILIZON_INSTANCE_HOST
-              value: {{ .Values.mobilizon.host | quote }}
+              value: {{ required "mobilizon.host is required (the public hostname, fixed after the first start)" .Values.mobilizon.host | quote }}
             - name: MOBILIZON_INSTANCE_NAME
               value: {{ .Values.mobilizon.name | quote }}
             - name: MOBILIZON_INSTANCE_DESCRIPTION
