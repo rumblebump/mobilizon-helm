@@ -1,0 +1,115 @@
+image:
+  repository: kaihuri/mobilizon
+  # Defaults to the chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+mobilizon:
+  # Public hostname. Mobilizon always builds https://<host> URLs, so terminate TLS in front of it.
+  host: mobilizon.example.com
+  name: Mobilizon
+  description: Change this to a proper description of your instance
+  email: noreply@mobilizon.example.com
+  registrationsOpen: false
+  # Any other plain MOBILIZON_* variable read by the image's config.exs, for example:
+  #   MOBILIZON_LOGLEVEL: info
+  #   MOBILIZON_INSTANCE_DEFAULT_LANGUAGE: de
+  env: {}
+  # Existing Secret holding the instance keys (recommended). Otherwise set both keys below,
+  # for example with `openssl rand -base64 48`. The chart never generates secrets.
+  existingSecret: ""
+  secretKeyBase: ""
+  secretKey: ""
+  secretKeys:
+    secretKeyBase: secret-key-base
+    secretKey: secret-key
+
+# Connection used by Mobilizon. With postgresql.enabled the host is the bundled server.
+database:
+  host: ""
+  port: 5432
+  name: mobilizon
+  username: mobilizon
+  # Required unless existingSecret is set.
+  password: ""
+  ssl: false
+  existingSecret: ""
+  secretKeys:
+    password: password
+    # Set to read the username from existingSecret too (for example "username" for CloudNativePG).
+    username: ""
+
+# Bundled PostGIS server. Mobilizon requires the postgis extension, so plain postgres will not do.
+# Disable it and set database.host to use an existing server or an operator such as CloudNativePG.
+postgresql:
+  enabled: true
+  image:
+    repository: postgis/postgis
+    tag: 17-3.6-alpine
+    pullPolicy: IfNotPresent
+  persistence:
+    size: 8Gi
+    storageClass: ""
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Only rendered when enabled. Unset, Mobilizon defaults to localhost:25.
+smtp:
+  enabled: false
+  host: ""
+  port: 587
+  # if_available, always or never
+  tls: if_available
+  ssl: false
+  auth: if_available
+  username: ""
+  # Ignored when existingSecret is set.
+  password: ""
+  existingSecret: ""
+  secretKeys:
+    password: password
+    # Set to read the username from existingSecret too.
+    username: ""
+
+# Uploaded pictures and exports.
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # Secret with the certificate for mobilizon.host. No TLS block when empty.
+  tlsSecretName: ""
+
+# Gateway API HTTPRoute for mobilizon.host.
+httpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  #  - name: my-gateway
+  #    namespace: gateway-system
+  #    sectionName: https
+
+extraEnv: []
+extraEnvFrom: []
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

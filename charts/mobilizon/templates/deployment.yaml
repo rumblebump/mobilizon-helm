@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mobilizon.fullname" . }}
+  labels:
+    {{- include "mobilizon.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  # Uploads live on a ReadWriteOnce volume, so run one pod and replace it on upgrade.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "mobilizon.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "mobilizon.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        # The image runs as nobody.
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if .Values.persistence.enabled }}
+      initContainers:
+        # A fresh volume hides the export directories baked into the image.
+        - name: init-uploads
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["mkdir", "-p", "/var/lib/mobilizon/uploads/exports/csv", "/var/lib/mobilizon/uploads/exports/pdf", "/var/lib/mobilizon/uploads/exports/ods"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: uploads
+              mountPath: /var/lib/mobilizon/uploads
+      {{- end }}
+      containers:
+        - name: mobilizon
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: MOBILIZON_INSTANCE_HOST
+              value: {{ .Values.mobilizon.host | quote }}
+            - name: MOBILIZON_INSTANCE_NAME
+              value: {{ .Values.mobilizon.name | quote }}
+            - name: MOBILIZON_INSTANCE_DESCRIPTION
+              value: {{ .Values.mobilizon.description | quote }}
+            - name: MOBILIZON_INSTANCE_EMAIL
+              value: {{ .Values.mobilizon.email | quote }}
+            - name: MOBILIZON_REPLY_EMAIL
+              value: {{ .Values.mobilizon.email | quote }}
+            - name: MOBILIZON_INSTANCE_REGISTRATIONS_OPEN
+              value: {{ .Values.mobilizon.registrationsOpen | quote }}
+            - name: MOBILIZON_INSTANCE_SECRET_KEY_BASE
+              {{- include "mobilizon.secretKeyRef" (list . .Values.mobilizon.existingSecret .Values.mobilizon.secretKeys.secretKeyBase "secret-key-base") | nindent 14 }}
+            - name: MOBILIZON_INSTANCE_SECRET_KEY
+              {{- include "mobilizon.secretKeyRef" (list . .Values.mobilizon.existingSecret .Values.mobilizon.secretKeys.secretKey "secret-key") | nindent 14 }}
+            {{- include "mobilizon.database.env" . | nindent 12 }}
+            {{- with .Values.smtp }}
+            {{- if .enabled }}
+            - name: MOBILIZON_SMTP_SERVER
+              value: {{ required "smtp.host is required when smtp.enabled=true" .host | quote }}
+            - name: MOBILIZON_SMTP_PORT
+              value: {{ .port | quote }}
+            - name: MOBILIZON_SMTP_TLS
+              value: {{ .tls | quote }}
+            - name: MOBILIZON_SMTP_SSL
+              value: {{ .ssl | quote }}
+            - name: MOBILIZON_SMTP_AUTH
+              value: {{ .auth | quote }}
+            {{- if or .username (and .existingSecret .secretKeys.username) }}
+            - name: MOBILIZON_SMTP_USERNAME
+              {{- include "mobilizon.username" (list $ .) | nindent 14 }}
+            {{- end }}
+            {{- if or .existingSecret .password }}
+            - name: MOBILIZON_SMTP_PASSWORD
+              {{- include "mobilizon.secretKeyRef" (list $ .existingSecret .secretKeys.password "smtp-password") | nindent 14 }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- range $name, $value := .Values.mobilizon.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 4000
+          # The entrypoint waits for the database and runs migrations before listening.
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: uploads
+              mountPath: /var/lib/mobilizon/uploads
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "mobilizon.fullname" .) }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
