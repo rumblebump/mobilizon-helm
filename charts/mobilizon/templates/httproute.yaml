@@ -1,4 +1,7 @@
 {{- if .Values.httpRoute.enabled }}
+{{- if not .Values.httpRoute.parentRefs }}
+{{- fail "httpRoute.parentRefs is required when httpRoute.enabled=true" }}
+{{- end }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -11,7 +14,7 @@ metadata:
   {{- end }}
 spec:
   parentRefs:
-    {{- required "httpRoute.parentRefs is required when httpRoute.enabled=true" .Values.httpRoute.parentRefs | toYaml | nindent 4 }}
+    {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
   hostnames:
     - {{ .Values.mobilizon.host | quote }}
   rules:
