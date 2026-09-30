@@ -1,0 +1,174 @@
+{{- if .Values.caddy.enabled }}
+{{- $fullname := printf "%s-caddy" (include "mobilizon.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- $caddyfile := include "mobilizon.caddyfile" . }}
+{{- if not .Values.caddy.existingConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "mobilizon.labels" . | nindent 4 }}
+    app.kubernetes.io/component: caddy
+data:
+  Caddyfile: |
+    {{- $caddyfile | nindent 4 }}
+---
+{{- end }}
+{{- if and .Values.caddy.persistence.enabled (not .Values.caddy.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "mobilizon.labels" . | nindent 4 }}
+    app.kubernetes.io/component: caddy
+  annotations:
+    # Holds the ACME account and certificates; losing it means re-issuing (and rate limits).
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.caddy.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.caddy.persistence.size }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "mobilizon.labels" . | nindent 4 }}
+    app.kubernetes.io/component: caddy
+  {{- with .Values.caddy.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.caddy.service.type }}
+  {{- with .Values.caddy.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- if ne .Values.caddy.service.type "ClusterIP" }}
+  {{- with .Values.caddy.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  {{- end }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: https
+      port: 443
+      targetPort: https
+  selector:
+    {{- include "mobilizon.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: caddy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "mobilizon.labels" . | nindent 4 }}
+    app.kubernetes.io/component: caddy
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "mobilizon.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: caddy
+  template:
+    metadata:
+      labels:
+        {{- include "mobilizon.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: caddy
+      annotations:
+        checksum/caddyfile: {{ $caddyfile | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        # Unprivileged ports, so Caddy needs no capabilities; the Service maps 80/443 to them.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: caddy
+          image: "{{ .Values.caddy.image.repository }}:{{ .Values.caddy.image.tag }}"
+          imagePullPolicy: {{ .Values.caddy.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          {{- with .Values.caddy.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.caddy.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+            - name: http3
+              containerPort: 8443
+              protocol: UDP
+          readinessProbe:
+            tcpSocket:
+              port: https
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: https
+            periodSeconds: 20
+          {{- with .Values.caddy.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: caddyfile
+              mountPath: /etc/caddy
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: caddyfile
+          configMap:
+            name: {{ .Values.caddy.existingConfigMap | default $fullname }}
+        - name: data
+          {{- if .Values.caddy.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.caddy.persistence.existingClaim | default $fullname }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: config
+          emptyDir: {}
+      {{- with .Values.caddy.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.caddy.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.caddy.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

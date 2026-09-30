@@ -1,0 +1,11 @@
+mobilizon:
+  host: mobilizon.example.org
+  secretKeyBase: ci-only-secret-key-base-ci-only-secret-key-base-ci-only-secret-key-base
+  secretKey: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+database:
+  password: ci-only
+caddy:
+  enabled: true
+  email: admin@example.org
+  siteConfig: |
+    encode gzip

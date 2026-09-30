@@ -32,8 +32,42 @@ kubectl exec deploy/mobilizon -- /bin/mobilizon_ctl users.new admin@example.org 
 | StatefulSet + Service | Bundled `postgis/postgis`, on by default. |
 | Secret | Only for credentials given inline in values instead of an existing Secret. |
 | Ingress / HTTPRoute | Off by default. |
+| Caddy | Off by default. TLS termination with automatic certificates, see below. |
 
 Mobilizon always generates `https://<mobilizon.host>` URLs, so put TLS in front of it (Ingress, Gateway or another proxy). `mobilizon.host` is required and is written into the database on first start (local actor URLs, including the internal relay actor), so set it before the first install. Changing it afterwards leads to errors such as `Relay actor not found`.
+
+## TLS with the bundled Caddy
+
+Without an Ingress controller or Gateway, the chart can run [Caddy](https://caddyserver.com) in front of Mobilizon. It gets a Let's Encrypt certificate for `mobilizon.host`, redirects HTTP to HTTPS and proxies to the Mobilizon Service. Its Service is a `LoadBalancer` on 80/443 (plus 443/UDP inside the pod for HTTP/3); point the DNS record at it.
+
+```yaml
+caddy:
+  enabled: true
+  email: admin@example.org              # ACME account
+  service:
+    loadBalancerIP: 203.0.113.10        # optional
+  # Directives inside the mobilizon.host site block, before reverse_proxy:
+  siteConfig: |
+    encode gzip
+    header Strict-Transport-Security "max-age=31536000"
+  # Extra global options and whole extra site blocks:
+  globalOptions: |
+    servers {
+      trusted_proxies static private_ranges
+    }
+  extraSites: |
+    status.example.org {
+      respond "ok"
+    }
+```
+
+Certificates and the ACME account live on a 1Gi PVC (kept on uninstall), so restarts do not hit Let's Encrypt rate limits. Caddy runs as a non-root user on 8080/8443 with a read-only root filesystem.
+
+For anything the options above cannot express, set `caddy.caddyfile` (replaces the generated file, run through `tpl`) or `caddy.existingConfigMap` (a ConfigMap with a `Caddyfile` key). Keep `http_port 8080` and `https_port 8443` in the global options.
+
+Plugins such as geoblocking (for example `caddy-maxmind-geolocation`) or DNS-01 providers need a custom build. Build one with `xcaddy` (`FROM caddy:builder` then `xcaddy build --with ...`), set `caddy.image`, and add the directives in `siteConfig` or `globalOptions` (for example `order geoip first`). Secrets for them, such as DNS API tokens or a MaxMind licence key, go in `caddy.extraEnv` / `caddy.extraEnvFrom` and are referenced as `{env.NAME}`. `externalTrafficPolicy: Local` is the default so Caddy sees real client IPs, which geoblocking needs.
+
+**Caddy or your existing Gateway?** If a cluster already terminates TLS (for example HAProxy in front of Envoy Gateway with cert-manager), keep using `httpRoute` or `ingress`: one entry point, one place for certificates, and no extra public IP. The bundled Caddy suits clusters without that, or when you want Caddy-specific features for this one site. Do not put both in the path, since Caddy cannot get a certificate over HTTP-01 when another proxy answers port 80 for the host.
 
 ## Using existing Secrets
 

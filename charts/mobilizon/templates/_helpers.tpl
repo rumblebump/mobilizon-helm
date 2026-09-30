@@ -81,3 +81,38 @@ value: {{ $cfg.username | quote }}
 - name: MOBILIZON_DATABASE_SSL
   value: {{ .Values.database.ssl | quote }}
 {{- end }}
+
+{{/* Caddyfile: caddy.caddyfile verbatim, or TLS for mobilizon.host in front of the Mobilizon service. */}}
+{{- define "mobilizon.caddyfile" -}}
+{{- if .Values.caddy.caddyfile -}}
+{{ tpl .Values.caddy.caddyfile . }}
+{{- else -}}
+{
+	http_port 8080
+	https_port 8443
+	# The pod listens on 8080/8443, so build the HTTPS redirect below without the port.
+	auto_https disable_redirects
+	{{- with .Values.caddy.email }}
+	email {{ . }}
+	{{- end }}
+	{{- with .Values.caddy.globalOptions }}
+	{{- tpl . $ | trim | replace "\n" "\n\t" | printf "\n\t%s" }}
+	{{- end }}
+}
+
+http://{{ required "mobilizon.host is required (the public hostname, fixed after the first start)" .Values.mobilizon.host }} {
+	redir https://{host}{uri} permanent
+}
+
+{{ .Values.mobilizon.host }} {
+	{{- with .Values.caddy.siteConfig }}
+	{{- tpl . $ | trim | replace "\n" "\n\t" | printf "\n\t%s" }}
+	{{- end }}
+	reverse_proxy {{ include "mobilizon.fullname" . }}:{{ .Values.service.port }}
+}
+{{- with .Values.caddy.extraSites }}
+
+{{ tpl . $ }}
+{{- end }}
+{{- end }}
+{{- end }}
