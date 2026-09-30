@@ -19,7 +19,11 @@ spec:
       labels:
         {{- include "mobilizon.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: web
-      {{- with .Values.podAnnotations }}
+      {{- $annotations := deepCopy .Values.podAnnotations }}
+      {{- if include "mobilizon.oidc.enabled" . }}
+      {{- $_ := set $annotations "checksum/config-exs" (include "mobilizon.configExs" . | sha256sum) }}
+      {{- end }}
+      {{- with $annotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -103,6 +107,12 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+            {{- if include "mobilizon.oidc.enabled" . }}
+            - name: MOBILIZON_CONFIG_PATH
+              value: /etc/mobilizon-chart/config.exs
+            - name: MOBILIZON_OIDC_CLIENT_SECRET
+              {{- include "mobilizon.oidc.clientSecret" . | nindent 14 }}
+            {{- end }}
             {{- range $name, $value := .Values.mobilizon.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
@@ -136,16 +146,30 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if .Values.persistence.enabled }}
+          {{- if or .Values.persistence.enabled (include "mobilizon.oidc.enabled" .) }}
           volumeMounts:
+            {{- if .Values.persistence.enabled }}
             - name: uploads
               mountPath: /var/lib/mobilizon/uploads
+            {{- end }}
+            {{- if include "mobilizon.oidc.enabled" . }}
+            - name: config
+              mountPath: /etc/mobilizon-chart
+              readOnly: true
+            {{- end }}
           {{- end }}
-      {{- if .Values.persistence.enabled }}
+      {{- if or .Values.persistence.enabled (include "mobilizon.oidc.enabled" .) }}
       volumes:
+        {{- if .Values.persistence.enabled }}
         - name: uploads
           persistentVolumeClaim:
             claimName: {{ .Values.persistence.existingClaim | default (include "mobilizon.fullname" .) }}
+        {{- end }}
+        {{- if include "mobilizon.oidc.enabled" . }}
+        - name: config
+          configMap:
+            name: {{ include "mobilizon.fullname" . }}-config
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

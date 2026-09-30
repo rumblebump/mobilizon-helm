@@ -1,0 +1,224 @@
+suite: oidc and dex
+release:
+  name: test
+set:
+  mobilizon.host: events.example.org
+  mobilizon.existingSecret: keys
+  database.existingSecret: db
+  oidc.existingSecret: oidc
+tests:
+  - it: renders no config or Dex by default
+    templates:
+      - config.yaml
+      - dex.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: requires the issuer for an external provider
+    template: deployment.yaml
+    set:
+      oidc.enabled: true
+      oidc.existingSecret: oidc
+    asserts:
+      - failedTemplate:
+          errorMessage: oidc.issuer is required when oidc.enabled=true
+
+  - it: writes a config.exs for an external provider
+    template: config.yaml
+    set:
+      oidc.enabled: true
+      oidc.issuer: https://sso.example.org
+      oidc.clientId: events
+      oidc.label: Company login
+      oidc.existingSecret: oidc
+    asserts:
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'import_config "/etc/mobilizon/config.exs"'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'issuer: "https://sso.example.org"'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'client_id: "events"'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'callback_url: "https://events.example.org/auth/oidc/callback"'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: '\{:oidc, "Company login"\}'
+
+  - it: points Mobilizon at the config and the client secret
+    template: deployment.yaml
+    set:
+      oidc.enabled: true
+      oidc.issuer: https://sso.example.org
+      oidc.clientId: events
+      oidc.existingSecret: oidc
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_CONFIG_PATH
+            value: /etc/mobilizon-chart/config.exs
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_OIDC_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: oidc
+                key: oidc-client-secret
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            configMap:
+              name: test-mobilizon-config
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config-exs"]
+
+  - it: stores an inline client secret in the chart Secret
+    template: secret.yaml
+    set:
+      dex.enabled: true
+      oidc.existingSecret: ""
+      oidc.clientSecret: s3cret
+    asserts:
+      - equal:
+          path: data["oidc-client-secret"]
+          value: czNjcmV0
+
+  - it: requires a client secret
+    template: secret.yaml
+    set:
+      dex.enabled: true
+      oidc.existingSecret: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: set oidc.existingSecret or oidc.clientSecret
+
+  - it: fills in the Mobilizon login from the bundled Dex
+    template: config.yaml
+    set:
+      dex.enabled: true
+      oidc.existingSecret: oidc
+    asserts:
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'issuer: "https://events.example.org/dex"'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'client_id: "mobilizon"'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: '\{:oidc, "Dex"\}'
+
+  - it: renders the Dex config, Service and Deployment
+    template: dex.yaml
+    set:
+      dex.enabled: true
+      oidc.existingSecret: oidc
+      dex.staticPasswords:
+        - email: admin@example.org
+          hash: "$2y$10$abc"
+          username: admin
+          userID: "1234"
+      dex.config:
+        expiry:
+          idTokens: 1h
+    asserts:
+      - hasDocuments:
+          count: 3
+      - isKind:
+          of: Secret
+        documentIndex: 0
+      - isKind:
+          of: Service
+        documentIndex: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 5556
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DEX_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: oidc
+                key: oidc-client-secret
+        documentIndex: 2
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: test-mobilizon-dex
+        documentIndex: 2
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+        documentIndex: 2
+
+  - it: uses an existing Secret for the Dex config
+    template: dex.yaml
+    set:
+      dex.enabled: true
+      dex.existingSecret: dex-config
+      oidc.existingSecret: oidc
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: dex-config
+        documentIndex: 1
+
+  - it: routes /dex to Dex in the default HTTPRoute
+    template: httproute.yaml
+    set:
+      dex.enabled: true
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+    asserts:
+      - equal:
+          path: spec.rules[0]
+          value:
+            matches:
+              - path: {type: PathPrefix, value: /dex}
+            backendRefs:
+              - name: test-mobilizon-dex
+                port: 5556
+
+  - it: routes /dex to Dex in the Ingress
+    template: ingress.yaml
+    set:
+      dex.enabled: true
+      ingress.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /dex
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: test-mobilizon-dex
+
+  - it: leaves routing to the user when Dex is on another host
+    template: ingress.yaml
+    set:
+      dex.enabled: true
+      dex.issuer: https://sso.example.org/dex
+      ingress.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.rules[0].http.paths
+          count: 1
+
+  - it: routes /dex to Dex in the Caddyfile
+    template: caddy.yaml
+    set:
+      dex.enabled: true
+      caddy.enabled: true
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data.Caddyfile
+          pattern: "\\treverse_proxy /dex/\\* test-mobilizon-dex:5556\\n\\treverse_proxy test-mobilizon:80"

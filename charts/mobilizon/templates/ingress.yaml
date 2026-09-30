@@ -23,6 +23,15 @@ spec:
     - host: {{ .Values.mobilizon.host | quote }}
       http:
         paths:
+          {{- with include "mobilizon.dex.path" . }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "mobilizon.dex.fullname" $ }}
+                port:
+                  name: http
+          {{- end }}
           - path: /
             pathType: Prefix
             backend:

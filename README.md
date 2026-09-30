@@ -33,6 +33,7 @@ kubectl exec deploy/mobilizon -- /bin/mobilizon_ctl users.new admin@example.org 
 | Secret | Only for credentials given inline in values instead of an existing Secret. |
 | Ingress / HTTPRoute | Off by default. |
 | Caddy | Off by default. TLS termination with automatic certificates, see below. |
+| Dex | Off by default. Login with local users through OpenID Connect, see below. |
 
 Mobilizon always generates `https://<mobilizon.host>` URLs, so put TLS in front of it (Ingress, Gateway or another proxy). `mobilizon.host` is required and is written into the database on first start (local actor URLs, including the internal relay actor), so set it before the first install. Changing it afterwards leads to errors such as `Relay actor not found`.
 
@@ -68,6 +69,33 @@ For anything the options above cannot express, set `caddy.caddyfile` (replaces t
 Plugins such as geoblocking (for example `caddy-maxmind-geolocation`) or DNS-01 providers need a custom build. Build one with `xcaddy` (`FROM caddy:builder` then `xcaddy build --with ...`), set `caddy.image`, and add the directives in `siteConfig` or `globalOptions` (for example `order geoip first`). Secrets for them, such as DNS API tokens or a MaxMind licence key, go in `caddy.extraEnv` / `caddy.extraEnvFrom` and are referenced as `{env.NAME}`. `externalTrafficPolicy: Local` is the default so Caddy sees real client IPs, which geoblocking needs.
 
 **Caddy or your existing Gateway?** If a cluster already terminates TLS (for example HAProxy in front of Envoy Gateway with cert-manager), keep using `httpRoute` or `ingress`: one entry point, one place for certificates, and no extra public IP. The bundled Caddy suits clusters without that, or when you want Caddy-specific features for this one site. Do not put both in the path, since Caddy cannot get a certificate over HTTP-01 when another proxy answers port 80 for the host.
+
+## Login with Dex or another OIDC provider
+
+`dex.enabled` runs [Dex](https://dexidp.io) with a local user database and adds a login button for it to Mobilizon. Dex is served on the same host under `/dex` (issuer `https://<mobilizon.host>/dex`), and the chart routes that path to Dex in the default HTTPRoute, Ingress and Caddy config.
+
+```yaml
+dex:
+  enabled: true
+  staticPasswords:
+    - email: admin@example.org
+      # htpasswd -nbBC 10 "" 'the-password' | cut -d: -f2
+      hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+      username: admin
+      userID: 08a8684b-db88-4b73-90a9-3cd1661f5466
+oidc:
+  existingSecret: mobilizon-oidc        # key: oidc-client-secret, shared by Dex and Mobilizon
+```
+
+The generated Dex config, hashes included, is stored in a Secret. To keep the hashes out of values, put a complete Dex `config.yaml` in your own Secret and set `dex.existingSecret`. It needs a static client with id `mobilizon`, `secretEnv: DEX_CLIENT_SECRET` and redirect URI `https://<mobilizon.host>/auth/oidc/callback`. `dex.config` is merged over the generated config for anything else (expiry, connectors). Dex keeps sessions in memory, so a restart only means logging in to Dex again.
+
+Any other provider works the same way without Dex: set `oidc.enabled`, `oidc.issuer`, `oidc.clientId`, `oidc.label` and the client secret, and register `https://<mobilizon.host>/auth/oidc/callback` at the provider. The chart then mounts a `config.exs` that imports the image's own config and adds the provider, through `MOBILIZON_CONFIG_PATH`.
+
+Things to know:
+
+- Mobilizon matches accounts by email only and ignores groups or other claims. An existing account with the same email is logged in.
+- An OIDC login creates the account even when `registrationsOpen` is false, and skips email confirmation. Everyone the provider lets in gets an account.
+- Mobilizon fetches the issuer's discovery document from inside the cluster, so the pod must be able to reach `https://<mobilizon.host>/dex`. Admin rights are still granted with `mobilizon_ctl users.modify <email> --admin`.
 
 ## Using existing Secrets
 

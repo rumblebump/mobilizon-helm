@@ -108,6 +108,9 @@ http://{{ required "mobilizon.host is required (the public hostname, fixed after
 	{{- with .Values.caddy.siteConfig }}
 	{{- tpl . $ | trim | replace "\n" "\n\t" | printf "\n\t%s" }}
 	{{- end }}
+	{{- with include "mobilizon.dex.path" . }}
+	reverse_proxy {{ trimSuffix "/" . }}/* {{ include "mobilizon.dex.fullname" $ }}:5556
+	{{- end }}
 	reverse_proxy {{ include "mobilizon.fullname" . }}:{{ .Values.service.port }}
 }
 {{- with .Values.caddy.extraSites }}
@@ -115,4 +118,96 @@ http://{{ required "mobilizon.host is required (the public hostname, fixed after
 {{ tpl . $ }}
 {{- end }}
 {{- end }}
+{{- end }}
+
+{{- define "mobilizon.dex.fullname" -}}
+{{- printf "%s-dex" (include "mobilizon.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "mobilizon.dex.issuer" -}}
+{{- .Values.dex.issuer | default (printf "https://%s/dex" .Values.mobilizon.host) }}
+{{- end }}
+
+{{/* Path of the Dex issuer when it is served on mobilizon.host, so the chart can route it. Empty otherwise. */}}
+{{- define "mobilizon.dex.path" -}}
+{{- if .Values.dex.enabled }}
+{{- $url := urlParse (include "mobilizon.dex.issuer" .) }}
+{{- if eq $url.host .Values.mobilizon.host }}
+{{- $url.path | default "/" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "mobilizon.oidc.enabled" -}}
+{{- if or .Values.oidc.enabled .Values.dex.enabled }}true{{ end }}
+{{- end }}
+
+{{- define "mobilizon.oidc.issuer" -}}
+{{- if .Values.oidc.issuer }}
+{{- .Values.oidc.issuer }}
+{{- else if .Values.dex.enabled }}
+{{- include "mobilizon.dex.issuer" . }}
+{{- else }}
+{{- fail "oidc.issuer is required when oidc.enabled=true" }}
+{{- end }}
+{{- end }}
+
+{{- define "mobilizon.oidc.clientId" -}}
+{{- if .Values.oidc.clientId }}
+{{- .Values.oidc.clientId }}
+{{- else if .Values.dex.enabled }}mobilizon
+{{- else }}
+{{- fail "oidc.clientId is required when oidc.enabled=true" }}
+{{- end }}
+{{- end }}
+
+{{- define "mobilizon.oidc.clientSecret" -}}
+{{- include "mobilizon.secretKeyRef" (list . .Values.oidc.existingSecret .Values.oidc.secretKeys.clientSecret "oidc-client-secret") }}
+{{- end }}
+
+{{/* Loaded through MOBILIZON_CONFIG_PATH instead of the image's config.exs, which it imports first. */}}
+{{- define "mobilizon.configExs" -}}
+import Config
+
+import_config "/etc/mobilizon/config.exs"
+
+config :ueberauth_oidcc, :issuers, [
+  %{name: :chart_oidc, issuer: {{ include "mobilizon.oidc.issuer" . | toJson }}}
+]
+
+config :ueberauth, Ueberauth,
+  providers: [
+    oidc:
+      {Ueberauth.Strategy.Oidcc,
+       [
+         issuer: :chart_oidc,
+         client_id: {{ include "mobilizon.oidc.clientId" . | toJson }},
+         client_secret: System.fetch_env!("MOBILIZON_OIDC_CLIENT_SECRET"),
+         scopes: {{ .Values.oidc.scopes | toJson }},
+         # Mobilizon sees plain HTTP on port 4000 behind the proxy, so fix the redirect URI.
+         callback_url: {{ printf "https://%s/auth/oidc/callback" .Values.mobilizon.host | toJson }}
+       ]}
+  ]
+
+config :mobilizon, :auth,
+  oauth_consumer_strategies: [{:oidc, {{ .Values.oidc.label | default (ternary "Dex" "OpenID Connect" .Values.dex.enabled) | toJson }}}]
+{{- end }}
+
+{{/* Dex config: static client for Mobilizon and local users, with dex.config merged over it. */}}
+{{- define "mobilizon.dex.config" -}}
+{{- $config := dict
+  "issuer" (include "mobilizon.dex.issuer" .)
+  "storage" (dict "type" "memory")
+  "web" (dict "http" "0.0.0.0:5556")
+  "telemetry" (dict "http" "0.0.0.0:5558")
+  "oauth2" (dict "passwordConnector" "local" "skipApprovalScreen" true)
+  "enablePasswordDB" true
+  "staticClients" (list (dict
+    "id" (include "mobilizon.oidc.clientId" .)
+    "name" .Values.mobilizon.name
+    "secretEnv" "DEX_CLIENT_SECRET"
+    "redirectURIs" (list (printf "https://%s/auth/oidc/callback" .Values.mobilizon.host))))
+  "staticPasswords" .Values.dex.staticPasswords
+}}
+{{- mergeOverwrite $config (deepCopy .Values.dex.config) | toYaml }}
 {{- end }}
