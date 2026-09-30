@@ -1,5 +1,7 @@
 # mobilizon-helm
 
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/mobilizon)](https://artifacthub.io/packages/search?repo=mobilizon)
+
 A minimal Helm chart for [Mobilizon](https://mobilizon.org). No subcharts or external chart dependencies: one Deployment for Mobilizon and, optionally, one PostGIS StatefulSet.
 
 ```sh
@@ -101,5 +103,13 @@ source:
 ```
 
 When following `0.0.0-dev`, the tag never changes, so Argo CD keeps serving its cached render after a new push. Hard refresh the application to pick up the latest build.
+
+## Artifact Hub
+
+The chart is listed on [Artifact Hub](https://artifacthub.io) straight from GHCR. Artifact Hub polls the registry, so a new tag shows up there on its next scan with no extra step. `0.0.0-dev` is marked as a pre-release. Chart annotations (license, images, links) live in [`Chart.yaml`](charts/mobilizon/Chart.yaml); when you bump `appVersion` or the PostGIS image, update `artifacthub.io/images` too.
+
+Repository metadata lives in [`artifacthub-repo.yml`](artifacthub-repo.yml). Once it has a `repositoryID`, each release also pushes it to GHCR as the `artifacthub.io` tag, which earns the Verified Publisher badge.
+
+To cut a release, push a tag: `git tag v0.1.0 && git push origin v0.1.0`.
 
 Run the unit tests locally with `helm plugin install https://github.com/helm-unittest/helm-unittest` and `helm unittest charts/mobilizon`.

@@ -1,0 +1,8 @@
+# Artifact Hub metadata for oci://ghcr.io/rumblebump/charts/mobilizon.
+# CI pushes this file to the registry as the `artifacthub.io` tag on every release.
+# After adding the repository on artifacthub.io, paste its ID below to get the
+# Verified Publisher badge.
+# repositoryID: 00000000-0000-0000-0000-000000000000
+# owners:
+#   - name: rumblebump
+#     email: you@example.org

@@ -13,3 +13,16 @@ keywords:
   - fediverse
   - activitypub
   - events
+annotations:
+  artifacthub.io/license: MIT
+  # Keep in sync with appVersion and postgresql.image in values.yaml (used for security scanning).
+  artifacthub.io/images: |
+    - name: mobilizon
+      image: kaihuri/mobilizon:5.2.4
+    - name: postgis
+      image: postgis/postgis:17-3.6-alpine
+  artifacthub.io/links: |
+    - name: Chart source
+      url: https://github.com/rumblebump/mobilizon-helm
+    - name: Mobilizon docs
+      url: https://docs.mobilizon.org
