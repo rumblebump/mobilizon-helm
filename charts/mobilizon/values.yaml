@@ -19,9 +19,11 @@ mobilizon:
   #   MOBILIZON_LOGLEVEL: info
   #   MOBILIZON_INSTANCE_DEFAULT_LANGUAGE: de
   env: {}
-  # Existing Secret holding the instance keys. When empty, the chart creates one with random
-  # values and keeps them on upgrade (via lookup, so not with `helm template` or Argo CD).
+  # Existing Secret holding the instance keys (recommended). Otherwise set both keys below,
+  # for example with `openssl rand -base64 48`. The chart never generates secrets.
   existingSecret: ""
+  secretKeyBase: ""
+  secretKey: ""
   secretKeys:
     secretKeyBase: secret-key-base
     secretKey: secret-key
@@ -32,7 +34,7 @@ database:
   port: 5432
   name: mobilizon
   username: mobilizon
-  # Ignored when existingSecret is set. Generated when empty.
+  # Required unless existingSecret is set.
   password: ""
   ssl: false
   existingSecret: ""
