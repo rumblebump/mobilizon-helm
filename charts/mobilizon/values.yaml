@@ -119,6 +119,10 @@ extraEnv: []
 extraEnvFrom: []
 
 resources: {}
+# Init container that creates the export directories on the uploads volume.
+initUploads:
+  # Defaults to resources above when empty.
+  resources: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
