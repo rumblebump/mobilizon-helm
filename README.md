@@ -78,3 +78,28 @@ Any other variable the image reads (see `config.exs` in the image, for example `
 The bundled `postgis/postgis` image is published for amd64 only. On arm64, point `postgresql.image` at an arm64 PostGIS build or use an external database.
 
 See [`values.yaml`](charts/mobilizon/values.yaml) for all options.
+
+## Installing from GHCR
+
+Once lint and the [helm-unittest](https://github.com/helm-unittest/helm-unittest) suite in `charts/mobilizon/tests` pass, CI publishes the chart to `oci://ghcr.io/rumblebump/charts/mobilizon`:
+
+- Every push to `main` publishes `0.0.0-dev`, overwriting the previous dev build.
+- Pushing a tag `vX.Y.Z` (for example `git tag v1.2.3 && git push origin v1.2.3`) publishes version `X.Y.Z`. The `version` in `Chart.yaml` is ignored; the tag decides.
+
+```sh
+helm pull oci://ghcr.io/rumblebump/charts/mobilizon --version 0.0.0-dev      # latest main
+helm install mobilizon oci://ghcr.io/rumblebump/charts/mobilizon --version 1.2.3 -f my-values.yaml
+```
+
+With Argo CD, register `ghcr.io/rumblebump/charts` as a Helm repository with `enableOCI: "true"` (no credentials needed while the package is public), then point the application at it. The `repoURL` has no `oci://` prefix:
+
+```yaml
+source:
+  repoURL: ghcr.io/rumblebump/charts
+  chart: mobilizon
+  targetRevision: 1.2.3   # or 0.0.0-dev to follow main
+```
+
+When following `0.0.0-dev`, the tag never changes, so Argo CD keeps serving its cached render after a new push. Hard refresh the application to pick up the latest build.
+
+Run the unit tests locally with `helm plugin install https://github.com/helm-unittest/helm-unittest` and `helm unittest charts/mobilizon`.

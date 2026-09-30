@@ -1,0 +1,167 @@
+suite: deployment
+templates:
+  - deployment.yaml
+release:
+  name: test
+set:
+  mobilizon.existingSecret: mobilizon-keys
+  database.existingSecret: mobilizon-db
+tests:
+  - it: runs one replica with Recreate and the appVersion image
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^kaihuri/mobilizon:.+$
+
+  - it: uses image.tag when set
+    set:
+      image.tag: "9.9.9"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: kaihuri/mobilizon:9.9.9
+
+  - it: reads the instance keys from mobilizon.existingSecret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_INSTANCE_SECRET_KEY_BASE
+            valueFrom:
+              secretKeyRef:
+                name: mobilizon-keys
+                key: secret-key-base
+
+  - it: reads inline credentials from the chart Secret
+    set:
+      mobilizon.existingSecret: ""
+      mobilizon.secretKeyBase: a
+      mobilizon.secretKey: b
+      database.existingSecret: ""
+      database.password: c
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: test-mobilizon
+                key: database-password
+
+  - it: points at the bundled PostgreSQL by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_DATABASE_HOST
+            value: test-mobilizon-postgresql
+
+  - it: uses database.host for an external server
+    set:
+      postgresql.enabled: false
+      database.host: db.example.org
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_DATABASE_HOST
+            value: db.example.org
+
+  - it: fails without a database host when PostgreSQL is disabled
+    set:
+      postgresql.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: database.host is required when postgresql.enabled=false
+
+  - it: reads the database username from the Secret when asked
+    set:
+      database.secretKeys.username: username
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_DATABASE_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: mobilizon-db
+                key: username
+
+  - it: leaves SMTP out unless enabled
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          any: true
+          content:
+            name: MOBILIZON_SMTP_SERVER
+
+  - it: requires smtp.host when SMTP is enabled
+    set:
+      smtp.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: smtp.host is required when smtp.enabled=true
+
+  - it: configures SMTP from an existing Secret
+    set:
+      smtp.enabled: true
+      smtp.host: smtp.example.org
+      smtp.existingSecret: mobilizon-smtp
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_SMTP_SERVER
+            value: smtp.example.org
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_SMTP_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mobilizon-smtp
+                key: password
+
+  - it: passes mobilizon.env through
+    set:
+      mobilizon.env:
+        MOBILIZON_LOGLEVEL: debug
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MOBILIZON_LOGLEVEL
+            value: debug
+
+  - it: mounts the uploads claim
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: test-mobilizon
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: init-uploads
+
+  - it: mounts an existing claim
+    set:
+      persistence.existingClaim: my-uploads
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: my-uploads
+
+  - it: drops the volume and init container without persistence
+    set:
+      persistence.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.volumes
+      - notExists:
+          path: spec.template.spec.initContainers
