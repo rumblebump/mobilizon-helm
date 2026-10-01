@@ -191,6 +191,10 @@ config :ueberauth, Ueberauth,
        ]}
   ]
 
+# ueberauth_oidcc looks up runtime options by the provider name, which Mobilizon passes as a
+# string. Without this map that lookup hits a keyword list and raises an ArgumentError.
+config :ueberauth_oidcc, :providers, %{"keycloak" => []}
+
 config :mobilizon, :auth,
   oauth_consumer_strategies: [{:keycloak, {{ .Values.oidc.label | default (ternary "Dex" "OpenID Connect" .Values.dex.enabled) | toJson }}}]
 {{- end }}
