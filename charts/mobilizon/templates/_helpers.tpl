@@ -175,9 +175,11 @@ config :ueberauth_oidcc, :issuers, [
   %{name: :chart_oidc, issuer: {{ include "mobilizon.oidc.issuer" . | toJson }}}
 ]
 
+# The login page only shows buttons for provider ids in a fixed list (src/utils/auth.ts) that
+# has no "oidc", so the generic OIDC strategy runs under the "keycloak" id with our own label.
 config :ueberauth, Ueberauth,
   providers: [
-    oidc:
+    keycloak:
       {Ueberauth.Strategy.Oidcc,
        [
          issuer: :chart_oidc,
@@ -185,12 +187,16 @@ config :ueberauth, Ueberauth,
          client_secret: System.fetch_env!("MOBILIZON_OIDC_CLIENT_SECRET"),
          scopes: {{ .Values.oidc.scopes | toJson }},
          # Mobilizon sees plain HTTP on port 4000 behind the proxy, so fix the redirect URI.
-         callback_url: {{ printf "https://%s/auth/oidc/callback" .Values.mobilizon.host | toJson }}
+         callback_url: {{ printf "https://%s/auth/keycloak/callback" .Values.mobilizon.host | toJson }}
        ]}
   ]
 
+# ueberauth_oidcc looks up runtime options by the provider name, which Mobilizon passes as a
+# string. Without this map that lookup hits a keyword list and raises an ArgumentError.
+config :ueberauth_oidcc, :providers, %{"keycloak" => []}
+
 config :mobilizon, :auth,
-  oauth_consumer_strategies: [{:oidc, {{ .Values.oidc.label | default (ternary "Dex" "OpenID Connect" .Values.dex.enabled) | toJson }}}]
+  oauth_consumer_strategies: [{:keycloak, {{ .Values.oidc.label | default (ternary "Dex" "OpenID Connect" .Values.dex.enabled) | toJson }}}]
 {{- end }}
 
 {{/* Dex config: static client for Mobilizon and local users, with dex.config merged over it. */}}
@@ -206,7 +212,7 @@ config :mobilizon, :auth,
     "id" (include "mobilizon.oidc.clientId" .)
     "name" .Values.mobilizon.name
     "secretEnv" "DEX_CLIENT_SECRET"
-    "redirectURIs" (list (printf "https://%s/auth/oidc/callback" .Values.mobilizon.host))))
+    "redirectURIs" (list (printf "https://%s/auth/keycloak/callback" .Values.mobilizon.host))))
   "staticPasswords" .Values.dex.staticPasswords
 }}
 {{- mergeOverwrite $config (deepCopy .Values.dex.config) | toYaml }}

@@ -200,7 +200,7 @@ dex:
   config: {}
   # Secret with a complete `config.yaml` key that replaces the generated one (keeps password
   # hashes out of values). It must contain a static client with id oidc.clientId, secretEnv
-  # DEX_CLIENT_SECRET and redirect URI https://<mobilizon.host>/auth/oidc/callback.
+  # DEX_CLIENT_SECRET and redirect URI https://<mobilizon.host>/auth/keycloak/callback.
   existingSecret: ""
   resources: {}
   nodeSelector: {}

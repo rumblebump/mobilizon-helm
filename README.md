@@ -87,9 +87,11 @@ oidc:
   existingSecret: mobilizon-oidc        # key: oidc-client-secret, shared by Dex and Mobilizon
 ```
 
-The generated Dex config, hashes included, is stored in a Secret. To keep the hashes out of values, put a complete Dex `config.yaml` in your own Secret and set `dex.existingSecret`. It needs a static client with id `mobilizon`, `secretEnv: DEX_CLIENT_SECRET` and redirect URI `https://<mobilizon.host>/auth/oidc/callback`. `dex.config` is merged over the generated config for anything else (expiry, connectors). Dex keeps sessions in memory, so a restart only means logging in to Dex again.
+The generated Dex config, hashes included, is stored in a Secret. To keep the hashes out of values, put a complete Dex `config.yaml` in your own Secret and set `dex.existingSecret`. It needs a static client with id `mobilizon`, `secretEnv: DEX_CLIENT_SECRET` and redirect URI `https://<mobilizon.host>/auth/keycloak/callback`. `dex.config` is merged over the generated config for anything else (expiry, connectors). Dex keeps sessions in memory, so a restart only means logging in to Dex again.
 
-Any other provider works the same way without Dex: set `oidc.enabled`, `oidc.issuer`, `oidc.clientId`, `oidc.label` and the client secret, and register `https://<mobilizon.host>/auth/oidc/callback` at the provider. The chart then mounts a `config.exs` that imports the image's own config and adds the provider, through `MOBILIZON_CONFIG_PATH`.
+Any other provider works the same way without Dex: set `oidc.enabled`, `oidc.issuer`, `oidc.clientId`, `oidc.label` and the client secret, and register `https://<mobilizon.host>/auth/keycloak/callback` at the provider. The path says `keycloak` because Mobilizon's login page only draws buttons for a fixed list of provider ids, and `oidc` isn't one of them; the provider is generic OIDC with your label. The chart then mounts a `config.exs` that imports the image's own config and adds the provider, through `MOBILIZON_CONFIG_PATH`.
+
+OIDC login needs an image with the cookie fix from [mobilizon-patched](https://github.com/rumblebump/mobilizon-patched), for example `image.repository: ghcr.io/rumblebump/mobilizon-patched`. Upstream's auth controller never fetches cookies, so with the stock image the callback crashes with "cannot fetch key … from conn.cookies because they were not fetched". This applies to Dex and to any other OIDC provider.
 
 Things to know:
 

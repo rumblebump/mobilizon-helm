@@ -44,10 +44,13 @@ tests:
           pattern: 'client_id: "events"'
       - matchRegex:
           path: data["config.exs"]
-          pattern: 'callback_url: "https://events.example.org/auth/oidc/callback"'
+          pattern: 'callback_url: "https://events.example.org/auth/keycloak/callback"'
       - matchRegex:
           path: data["config.exs"]
-          pattern: '\{:oidc, "Company login"\}'
+          pattern: '\{:keycloak, "Company login"\}'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'config :ueberauth_oidcc, :providers, %\{"keycloak" => \[\]\}'
 
   - it: points Mobilizon at the config and the client secret
     template: deployment.yaml
@@ -113,7 +116,7 @@ tests:
           pattern: 'client_id: "mobilizon"'
       - matchRegex:
           path: data["config.exs"]
-          pattern: '\{:oidc, "Dex"\}'
+          pattern: '\{:keycloak, "Dex"\}'
 
   - it: renders the Dex config, Service and Deployment
     template: dex.yaml
