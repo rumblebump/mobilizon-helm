@@ -1,5 +1,8 @@
 image:
-  repository: kaihuri/mobilizon
+  # Upstream Mobilizon plus a few patches (OIDC login fixes, opt-in profile limits), rebuilt from each
+  # upstream release: https://github.com/rumblebump/mobilizon-patched. The stock image is
+  # kaihuri/mobilizon, but OIDC login doesn't work with it.
+  repository: ghcr.io/rumblebump/mobilizon-patched
   # Defaults to the chart appVersion.
   tag: ""
   pullPolicy: IfNotPresent
@@ -20,6 +23,8 @@ mobilizon:
   # Any other plain MOBILIZON_* variable read by the image's config.exs, for example:
   #   MOBILIZON_LOGLEVEL: info
   #   MOBILIZON_INSTANCE_DEFAULT_LANGUAGE: de
+  #   MOBILIZON_INSTANCE_RESTRICT_PROFILES: "true"  # patched image: one profile per account
+  #   MOBILIZON_INSTANCE_LOCK_PROFILES: "true"      # patched image: profile name = email local part
   env: {}
   # Existing Secret holding the instance keys (recommended). Otherwise set both keys below,
   # for example with `openssl rand -base64 48`. The chart never generates secrets.

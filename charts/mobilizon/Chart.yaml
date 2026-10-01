@@ -2,7 +2,7 @@ apiVersion: v2
 name: mobilizon
 description: Minimal Helm chart for Mobilizon, the federated event and group platform
 type: application
-version: 0.1.0
+version: 0.0.3
 appVersion: "5.2.4"
 home: https://mobilizon.org
 sources:
@@ -18,7 +18,7 @@ annotations:
   # Keep in sync with appVersion and postgresql.image in values.yaml (used for security scanning).
   artifacthub.io/images: |
     - name: mobilizon
-      image: kaihuri/mobilizon:5.2.4
+      image: ghcr.io/rumblebump/mobilizon-patched:5.2.4
     - name: postgis
       image: postgis/postgis:17-3.6-alpine
     - name: caddy

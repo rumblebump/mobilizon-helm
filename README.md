@@ -27,7 +27,7 @@ kubectl exec deploy/mobilizon -- /bin/mobilizon_ctl users.new admin@example.org 
 
 | Object | Notes |
 | --- | --- |
-| Deployment | `kaihuri/mobilizon` (the official image, now maintained by Kaihuri). The image entrypoint waits for the database, creates `pg_trgm` and `unaccent`, runs migrations, then starts on port 4000. One replica with `Recreate`, because uploads are on a ReadWriteOnce volume. |
+| Deployment | `ghcr.io/rumblebump/mobilizon-patched`: the official `kaihuri/mobilizon` release with a few [patches](https://github.com/rumblebump/mobilizon-patched) (working OIDC login, opt-in `MOBILIZON_INSTANCE_RESTRICT_PROFILES` and `MOBILIZON_INSTANCE_LOCK_PROFILES`), built for amd64 and arm64. Set `image.repository: kaihuri/mobilizon` for the stock image. The image entrypoint waits for the database, creates `pg_trgm` and `unaccent`, runs migrations, then starts on port 4000. One replica with `Recreate`, because uploads are on a ReadWriteOnce volume. |
 | PVC | Uploads at `/var/lib/mobilizon/uploads`. Kept on uninstall. |
 | StatefulSet + Service | Bundled `postgis/postgis`, on by default. |
 | Secret | Only for credentials given inline in values instead of an existing Secret. |
@@ -91,7 +91,7 @@ The generated Dex config, hashes included, is stored in a Secret. To keep the ha
 
 Any other provider works the same way without Dex: set `oidc.enabled`, `oidc.issuer`, `oidc.clientId`, `oidc.label` and the client secret, and register `https://<mobilizon.host>/auth/keycloak/callback` at the provider. The path says `keycloak` because Mobilizon's login page only draws buttons for a fixed list of provider ids, and `oidc` isn't one of them; the provider is generic OIDC with your label. The chart then mounts a `config.exs` that imports the image's own config and adds the provider, through `MOBILIZON_CONFIG_PATH`.
 
-OIDC login needs an image with the cookie fix from [mobilizon-patched](https://github.com/rumblebump/mobilizon-patched), for example `image.repository: ghcr.io/rumblebump/mobilizon-patched`. Upstream's auth controller never fetches cookies, so with the stock image the callback crashes with "cannot fetch key … from conn.cookies because they were not fetched". This applies to Dex and to any other OIDC provider.
+OIDC login needs the default patched image. Upstream's auth controller never fetches cookies, so with the stock image the callback crashes with "cannot fetch key … from conn.cookies because they were not fetched". This applies to Dex and to any other OIDC provider.
 
 Things to know:
 
