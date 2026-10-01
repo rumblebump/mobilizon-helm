@@ -91,6 +91,8 @@ The generated Dex config, hashes included, is stored in a Secret. To keep the ha
 
 Any other provider works the same way without Dex: set `oidc.enabled`, `oidc.issuer`, `oidc.clientId`, `oidc.label` and the client secret, and register `https://<mobilizon.host>/auth/keycloak/callback` at the provider. The path says `keycloak` because Mobilizon's login page only draws buttons for a fixed list of provider ids, and `oidc` isn't one of them; the provider is generic OIDC with your label. The chart then mounts a `config.exs` that imports the image's own config and adds the provider, through `MOBILIZON_CONFIG_PATH`.
 
+OIDC login needs an image with the cookie fix from [mobilizon-patched](https://github.com/rumblebump/mobilizon-patched), for example `image.repository: ghcr.io/rumblebump/mobilizon-patched`. Upstream's auth controller never fetches cookies, so with the stock image the callback crashes with "cannot fetch key … from conn.cookies because they were not fetched". This applies to Dex and to any other OIDC provider.
+
 Things to know:
 
 - Mobilizon matches accounts by email only and ignores groups or other claims. An existing account with the same email is logged in.
