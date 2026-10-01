@@ -18,7 +18,7 @@ tests:
           value: Recreate
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^kaihuri/mobilizon:.+$
+          pattern: ^ghcr\.io/rumblebump/mobilizon-patched:.+$
 
   - it: uses image.tag when set
     set:
@@ -26,7 +26,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: kaihuri/mobilizon:9.9.9
+          value: ghcr.io/rumblebump/mobilizon-patched:9.9.9
 
   - it: reads the instance keys from mobilizon.existingSecret
     asserts:
