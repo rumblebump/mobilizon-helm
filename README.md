@@ -116,7 +116,7 @@ hostAliases:
     hostnames: [events.example.org]
 ```
 
-Also check egress NetworkPolicies on the Mobilizon pod. If the issuer's certificate comes from a private CA, mount a bundle that includes it with `extraVolumes` and `extraVolumeMounts` over `/etc/ssl/certs/ca-certificates.crt` (`subPath`).
+Also check egress NetworkPolicies on the Mobilizon pod. If the issuer's certificate comes from a private CA, add it with `extraCACerts` (see [Private CAs](#private-cas)).
 
 ## Using existing Secrets
 
@@ -155,6 +155,21 @@ database:
 ```
 
 The example above matches the `<cluster>-app` Secret of a CloudNativePG cluster. On an external server, create the `postgis` extension in the database beforehand (it needs a superuser), for example with CloudNativePG's `postInitApplicationSQL: ["CREATE EXTENSION IF NOT EXISTS postgis"]`.
+
+## Private CAs
+
+Mobilizon verifies TLS for PostgreSQL (`database.ssl: true`), LDAP, SMTP and the OIDC issuer against the image's `/etc/ssl/certs/ca-certificates.crt`, and has no switch to skip verification. A server signed by a private CA (Puppet, CloudNativePG, an internal PKI) fails with `Unknown CA`. Put the CA certificates in PEM form in a ConfigMap or Secret, one or more keys, and point `extraCACerts` at it:
+
+```sh
+kubectl create configmap puppet-ca --from-file=puppet-ca.pem
+```
+
+```yaml
+extraCACerts:
+  configMap: puppet-ca   # or secret: ...
+```
+
+An init container appends every key to the image's own bundle on each pod start and mounts the result over that path, so the public CAs (federation, SMTP, OIDC) stay and image upgrades bring their updates. Add the root CA (Subject equals Issuer); a server's own certificate is not enough. Restart the pod after changing the ConfigMap.
 
 ## Other settings
 

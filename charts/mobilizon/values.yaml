@@ -214,8 +214,13 @@ dex:
 
 extraEnv: []
 extraEnvFrom: []
-# Extra volumes and mounts for the Mobilizon container, for example a CA bundle mounted over
-# /etc/ssl/certs/ca-certificates.crt (subPath) when the OIDC issuer uses a private CA.
+# CA certificates (PEM) to trust on top of the image's public CAs, for a database, LDAP, SMTP or
+# OIDC server signed by a private CA. Every key of the ConfigMap or Secret is appended to the
+# image's /etc/ssl/certs/ca-certificates.crt at pod start. Set configMap or secret, not both.
+extraCACerts:
+  configMap: ""
+  secret: ""
+# Extra volumes and mounts for the Mobilizon container.
 extraVolumes: []
 extraVolumeMounts: []
 # /etc/hosts entries for the Mobilizon pod. Mobilizon fetches the OIDC issuer's discovery document

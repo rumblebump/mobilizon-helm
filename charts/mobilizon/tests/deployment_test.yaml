@@ -242,3 +242,58 @@ tests:
     asserts:
       - notExists:
           path: spec.template.spec.hostAliases
+
+  - it: adds no CA init container by default
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-ca-certs
+          any: true
+
+  - it: appends extraCACerts to the image's trust store
+    set:
+      persistence.enabled: false
+      extraCACerts.configMap: puppet-ca
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: init-ca-certs
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            name: extra-ca-certs
+            mountPath: /extra-ca-certs
+            readOnly: true
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: trust
+            mountPath: /etc/ssl/certs/ca-certificates.crt
+            subPath: ca-certificates.crt
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: extra-ca-certs
+            configMap:
+              name: puppet-ca
+
+  - it: reads extraCACerts from a Secret
+    set:
+      extraCACerts.secret: puppet-ca
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: extra-ca-certs
+            secret:
+              secretName: puppet-ca
+
+  - it: rejects both extraCACerts sources
+    set:
+      extraCACerts.configMap: a
+      extraCACerts.secret: b
+    asserts:
+      - failedTemplate:
+          errorMessage: set extraCACerts.configMap or extraCACerts.secret, not both

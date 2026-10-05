@@ -1,3 +1,7 @@
+{{- $caCerts := or .Values.extraCACerts.configMap .Values.extraCACerts.secret }}
+{{- if and .Values.extraCACerts.configMap .Values.extraCACerts.secret }}
+{{- fail "set extraCACerts.configMap or extraCACerts.secret, not both" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,8 +44,9 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-      {{- if .Values.persistence.enabled }}
+      {{- if or .Values.persistence.enabled $caCerts }}
       initContainers:
+        {{- if .Values.persistence.enabled }}
         # A fresh volume hides the export directories baked into the image.
         - name: init-uploads
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -58,6 +63,35 @@ spec:
           volumeMounts:
             - name: uploads
               mountPath: /var/lib/mobilizon/uploads
+        {{- end }}
+        {{- if $caCerts }}
+        # The image's trust store plus extraCACerts, rebuilt on every start so image upgrades
+        # keep their public CAs.
+        - name: init-ca-certs
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              cat /etc/ssl/certs/ca-certificates.crt > /trust/ca-certificates.crt
+              for f in /extra-ca-certs/*; do echo; cat "$f"; done >> /trust/ca-certificates.crt
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          {{- with .Values.initUploads.resources | default .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: trust
+              mountPath: /trust
+            - name: extra-ca-certs
+              mountPath: /extra-ca-certs
+              readOnly: true
+        {{- end }}
       {{- end }}
       containers:
         - name: mobilizon
@@ -146,7 +180,7 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if or .Values.persistence.enabled (include "mobilizon.oidc.enabled" .) .Values.extraVolumeMounts }}
+          {{- if or .Values.persistence.enabled (include "mobilizon.oidc.enabled" .) $caCerts .Values.extraVolumeMounts }}
           volumeMounts:
             {{- if .Values.persistence.enabled }}
             - name: uploads
@@ -157,11 +191,17 @@ spec:
               mountPath: /etc/mobilizon-chart
               readOnly: true
             {{- end }}
+            {{- if $caCerts }}
+            - name: trust
+              mountPath: /etc/ssl/certs/ca-certificates.crt
+              subPath: ca-certificates.crt
+              readOnly: true
+            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-      {{- if or .Values.persistence.enabled (include "mobilizon.oidc.enabled" .) .Values.extraVolumes }}
+      {{- if or .Values.persistence.enabled (include "mobilizon.oidc.enabled" .) $caCerts .Values.extraVolumes }}
       volumes:
         {{- if .Values.persistence.enabled }}
         - name: uploads
@@ -172,6 +212,18 @@ spec:
         - name: config
           configMap:
             name: {{ include "mobilizon.fullname" . }}-config
+        {{- end }}
+        {{- if $caCerts }}
+        - name: trust
+          emptyDir: {}
+        - name: extra-ca-certs
+          {{- if .Values.extraCACerts.configMap }}
+          configMap:
+            name: {{ .Values.extraCACerts.configMap }}
+          {{- else }}
+          secret:
+            secretName: {{ .Values.extraCACerts.secret }}
+          {{- end }}
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
