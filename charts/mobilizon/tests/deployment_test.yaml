@@ -205,3 +205,40 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: mobilizon.host is required (the public hostname, fixed after the first start)
+
+  - it: renders hostAliases, extraVolumes and extraVolumeMounts
+    set:
+      hostAliases:
+        - ip: 10.43.12.34
+          hostnames: [events.example.org]
+      extraVolumes:
+        - name: ca
+          configMap:
+            name: my-ca
+      extraVolumeMounts:
+        - name: ca
+          mountPath: /etc/ssl/certs/ca-certificates.crt
+          subPath: ca-certificates.crt
+    asserts:
+      - equal:
+          path: spec.template.spec.hostAliases
+          value:
+            - ip: 10.43.12.34
+              hostnames: [events.example.org]
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: ca
+            configMap:
+              name: my-ca
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: ca
+            mountPath: /etc/ssl/certs/ca-certificates.crt
+            subPath: ca-certificates.crt
+
+  - it: leaves hostAliases out by default
+    asserts:
+      - notExists:
+          path: spec.template.spec.hostAliases

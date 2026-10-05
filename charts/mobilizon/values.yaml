@@ -214,6 +214,16 @@ dex:
 
 extraEnv: []
 extraEnvFrom: []
+# Extra volumes and mounts for the Mobilizon container, for example a CA bundle mounted over
+# /etc/ssl/certs/ca-certificates.crt (subPath) when the OIDC issuer uses a private CA.
+extraVolumes: []
+extraVolumeMounts: []
+# /etc/hosts entries for the Mobilizon pod. Mobilizon fetches the OIDC issuer's discovery document
+# from inside the pod, so when the public hostname doesn't resolve or route from the cluster
+# (no hairpin NAT), point it at the in-cluster Gateway or Ingress controller Service:
+#   - ip: 10.43.12.34          # ClusterIP of the Envoy/Ingress Service
+#     hostnames: [events.example.org]
+hostAliases: []
 
 resources: {}
 # Init container that creates the export directories on the uploads volume.
