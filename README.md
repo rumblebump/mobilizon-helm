@@ -97,7 +97,26 @@ Things to know:
 
 - Mobilizon matches accounts by email only and ignores groups or other claims. An existing account with the same email is logged in.
 - An OIDC login creates the account even when `registrationsOpen` is false, and skips email confirmation. Everyone the provider lets in gets an account.
-- Mobilizon fetches the issuer's discovery document from inside the cluster, so the pod must be able to reach `https://<mobilizon.host>/dex`. Admin rights are still granted with `mobilizon_ctl users.modify <email> --admin`.
+- Admin rights are still granted with `mobilizon_ctl users.modify <email> --admin`.
+
+### "Metadata load failed for issuer … :timeout"
+
+Mobilizon fetches the issuer's discovery document from inside its pod, at the public issuer URL (`https://<mobilizon.host>/dex` with the bundled Dex). The issuer has to stay the public URL, because the discovery document must name the same issuer the browser sees. A timeout means the pod can't reach that URL; a certificate problem shows up as a TLS error instead. Test from the pod:
+
+```sh
+kubectl exec deploy/mobilizon -- nslookup events.example.org
+kubectl exec deploy/mobilizon -- wget -qO- -T 5 https://events.example.org/dex/.well-known/openid-configuration
+```
+
+The usual cause is that the hostname resolves to your public IP and the router doesn't do hairpin NAT, so traffic from inside never comes back. Fix it in DNS (split DNS, or a CoreDNS `rewrite` to the Gateway Service), on the router (NAT loopback), or per pod with `hostAliases` pointing the host at the ClusterIP of the Gateway or Ingress controller Service that serves it:
+
+```yaml
+hostAliases:
+  - ip: 10.43.12.34          # kubectl get svc -A | grep -i -e envoy -e ingress
+    hostnames: [events.example.org]
+```
+
+Also check egress NetworkPolicies on the Mobilizon pod. If the issuer's certificate comes from a private CA, mount a bundle that includes it with `extraVolumes` and `extraVolumeMounts` over `/etc/ssl/certs/ca-certificates.crt` (`subPath`).
 
 ## Using existing Secrets
 
