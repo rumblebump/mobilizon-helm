@@ -99,6 +99,23 @@ Things to know:
 - An OIDC login creates the account even when `registrationsOpen` is false, and skips email confirmation. Everyone the provider lets in gets an account.
 - Admin rights are still granted with `mobilizon_ctl users.modify <email> --admin`.
 
+### Authelia
+
+Authelia needs two settings that Dex doesn't. It puts email and name only in the userinfo response, and it advertises `client_secret_jwt`, which Mobilizon would otherwise prefer over the method the client is registered with:
+
+```yaml
+oidc:
+  enabled: true
+  issuer: https://auth.example.org
+  clientId: mobilizon
+  label: Authelia
+  existingSecret: mobilizon-oidc        # key: oidc-client-secret, the plain secret
+  userinfo: true
+  tokenEndpointAuthMethod: client_secret_basic
+```
+
+On the Authelia side the client looks like [Authelia's Mobilizon guide](https://www.authelia.com/integration/openid-connect/clients/mobilizon/), with the same redirect URI `https://<mobilizon.host>/auth/keycloak/callback` and `token_endpoint_auth_method` matching `oidc.tokenEndpointAuthMethod` (the guide uses `client_secret_post`; either works if both sides agree). Store the secret in Authelia as a hash (`authelia crypto hash generate pbkdf2 --variant sha512`) and give Mobilizon the plain value. The guide's own `config.exs` uses Mobilizon's Keycloak strategy with hand-written endpoint URLs; the chart uses generic OIDC discovery instead, so none of that is needed. Authelia requires HTTPS, so if its certificate comes from a private CA add it with `extraCACerts`.
+
 ### "Metadata load failed for issuer … :timeout"
 
 Mobilizon fetches the issuer's discovery document from inside its pod, at the public issuer URL (`https://<mobilizon.host>/dex` with the bundled Dex). The issuer has to stay the public URL, because the discovery document must name the same issuer the browser sees. A timeout means the pod can't reach that URL; a certificate problem shows up as a TLS error instead. Test from the pod:

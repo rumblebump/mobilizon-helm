@@ -188,6 +188,17 @@ config :ueberauth, Ueberauth,
          scopes: {{ .Values.oidc.scopes | toJson }},
          # Mobilizon sees plain HTTP on port 4000 behind the proxy, so fix the redirect URI.
          callback_url: {{ printf "https://%s/auth/keycloak/callback" .Values.mobilizon.host | toJson }}
+         {{- if .Values.oidc.userinfo }},
+         # Read email and name from the userinfo endpoint, not only the ID token.
+         userinfo: true
+         {{- end }}
+         {{- with .Values.oidc.tokenEndpointAuthMethod }}
+         {{- if not (has . (list "client_secret_basic" "client_secret_post" "client_secret_jwt" "private_key_jwt")) }}
+         {{- fail "oidc.tokenEndpointAuthMethod must be client_secret_basic, client_secret_post, client_secret_jwt or private_key_jwt" }}
+         {{- end }},
+         # Otherwise oidcc picks the strongest method the provider advertises.
+         preferred_auth_methods: [:{{ . }}]
+         {{- end }}
        ]}
   ]
 
