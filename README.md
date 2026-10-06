@@ -116,6 +116,10 @@ oidc:
 
 On the Authelia side the client looks like [Authelia's Mobilizon guide](https://www.authelia.com/integration/openid-connect/clients/mobilizon/), with the same redirect URI `https://<mobilizon.host>/auth/keycloak/callback` and `token_endpoint_auth_method` matching `oidc.tokenEndpointAuthMethod` (the guide uses `client_secret_post`; either works if both sides agree). Store the secret in Authelia as a hash (`authelia crypto hash generate pbkdf2 --variant sha512`) and give Mobilizon the plain value. The guide's own `config.exs` uses Mobilizon's Keycloak strategy with hand-written endpoint URLs; the chart uses generic OIDC discovery instead, so none of that is needed. Authelia requires HTTPS, so if its certificate comes from a private CA add it with `extraCACerts`.
 
+Authelia also advertises signed request objects, pushed authorization requests and JWT responses, which Mobilizon's OIDC client would use and Authelia then rejects, so the login page answers `/auth/keycloak` with a 500. `oidc.plainAuthorizationRequest` (on by default) hides those from Mobilizon, so it sends a plain authorization code request with PKCE. Turn it off only for a provider that requires them.
+
+Write `oidc.issuer` exactly as the provider's `/.well-known/openid-configuration` reports `issuer`, usually without a trailing slash. Any difference fails with `{:issuer_mismatch, …}`.
+
 ### "Metadata load failed for issuer … :timeout"
 
 Mobilizon fetches the issuer's discovery document from inside its pod, at the public issuer URL (`https://<mobilizon.host>/dex` with the bundled Dex). The issuer has to stay the public URL, because the discovery document must name the same issuer the browser sees. A timeout means the pod can't reach that URL; a certificate problem shows up as a TLS error instead. Test from the pod:

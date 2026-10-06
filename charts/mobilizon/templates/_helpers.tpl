@@ -172,7 +172,25 @@ import Config
 import_config "/etc/mobilizon/config.exs"
 
 config :ueberauth_oidcc, :issuers, [
-  %{name: :chart_oidc, issuer: {{ include "mobilizon.oidc.issuer" . | toJson }}}
+  %{
+    name: :chart_oidc,
+    issuer: {{ include "mobilizon.oidc.issuer" . | toJson }}
+    {{- if .Values.oidc.plainAuthorizationRequest }},
+    # oidcc otherwise signs the request with the client secret (HS256 request object), pushes it
+    # to the PAR endpoint and asks for a JWT-wrapped response when the provider advertises
+    # them. Authelia does, and rejects that unless the client is set up for it; Mobilizon answers
+    # such a failure on /auth/keycloak with a 500. Hide them to send a plain code + PKCE request.
+    provider_configuration_opts: %{
+      quirks: %{
+        document_overrides: %{
+          "request_parameter_supported" => false,
+          "pushed_authorization_request_endpoint" => :undefined,
+          "response_modes_supported" => ["query"]
+        }
+      }
+    }
+    {{- end }}
+  }
 ]
 
 # The login page only shows buttons for provider ids in a fixed list (src/utils/auth.ts) that

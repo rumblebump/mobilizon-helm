@@ -188,6 +188,10 @@ oidc:
   # provider advertises, which must then be the one the client is registered with. Set it to
   # the client's token_endpoint_auth_method for Authelia.
   tokenEndpointAuthMethod: ""
+  # Send a plain authorization code + PKCE request even when the provider advertises signed
+  # request objects, pushed authorization requests (PAR) or JWT responses (JARM). Authelia
+  # advertises all three and the login fails with a 500 without this.
+  plainAuthorizationRequest: true
 
 # Optional Dex (https://dexidp.io) as a small OIDC provider with local users, wired to the
 # Mobilizon login. Served on the same host under /dex: the chart routes that path to Dex in the
