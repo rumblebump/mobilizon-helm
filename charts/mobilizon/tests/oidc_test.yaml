@@ -52,6 +52,47 @@ tests:
           path: data["config.exs"]
           pattern: 'config :ueberauth_oidcc, :providers, %\{"keycloak" => \[\]\}'
 
+  - it: adds userinfo and the token endpoint auth method for Authelia
+    template: config.yaml
+    set:
+      oidc.enabled: true
+      oidc.issuer: https://auth.example.org
+      oidc.clientId: mobilizon
+      oidc.userinfo: true
+      oidc.tokenEndpointAuthMethod: client_secret_post
+    asserts:
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'callback_url: "https://events.example.org/auth/keycloak/callback",\n'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'userinfo: true,\n'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: 'preferred_auth_methods: \[:client_secret_post\]\n *\]\}'
+
+  - it: leaves userinfo and the auth method out by default
+    template: config.yaml
+    set:
+      oidc.enabled: true
+      oidc.issuer: https://sso.example.org
+      oidc.clientId: events
+    asserts:
+      - notMatchRegex:
+          path: data["config.exs"]
+          pattern: 'userinfo|preferred_auth_methods'
+
+  - it: rejects an unknown token endpoint auth method
+    template: deployment.yaml
+    set:
+      oidc.enabled: true
+      oidc.issuer: https://sso.example.org
+      oidc.clientId: events
+      oidc.tokenEndpointAuthMethod: none
+    asserts:
+      - failedTemplate:
+          errorMessage: oidc.tokenEndpointAuthMethod must be client_secret_basic, client_secret_post, client_secret_jwt or private_key_jwt
+
   - it: points Mobilizon at the config and the client secret
     template: deployment.yaml
     set:
