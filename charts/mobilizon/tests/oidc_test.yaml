@@ -71,6 +71,35 @@ tests:
           path: data["config.exs"]
           pattern: 'preferred_auth_methods: \[:client_secret_post\]\n *\]\}'
 
+  - it: hides request objects, PAR and JARM by default
+    template: config.yaml
+    set:
+      oidc.enabled: true
+      oidc.issuer: https://auth.example.org
+      oidc.clientId: mobilizon
+    asserts:
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: '"request_parameter_supported" => false'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: '"pushed_authorization_request_endpoint" => :undefined'
+      - matchRegex:
+          path: data["config.exs"]
+          pattern: '"response_modes_supported" => \["query"\]'
+
+  - it: keeps the provider's request features when plainAuthorizationRequest is off
+    template: config.yaml
+    set:
+      oidc.enabled: true
+      oidc.issuer: https://auth.example.org
+      oidc.clientId: mobilizon
+      oidc.plainAuthorizationRequest: false
+    asserts:
+      - notMatchRegex:
+          path: data["config.exs"]
+          pattern: 'document_overrides'
+
   - it: leaves userinfo and the auth method out by default
     template: config.yaml
     set:
